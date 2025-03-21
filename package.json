@@ -1,0 +1,37 @@
+{
+  "name": "testmesh",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "lock": "npx tsx src/lock-assets.ts",
+    "unlock": "npx tsx src/unlock-assets.ts"
+  },
+  "dependencies": {
+    "@meshsdk/contract": "^1.7.20",
+    "@meshsdk/core": "^1.5.25",
+    "@meshsdk/core-cst": "^1.9.0-beta.20",
+    "@meshsdk/react": "^1.1.12",
+    "axios": "^1.7.5",
+    "cbor-x": "^1.6.0",
+    "dotenv": "^16.4.7",
+    "elliptic": "^6.5.7",
+    "next": "^14.2.24",
+    "react": "^18",
+    "react-copy-to-clipboard": "^5.1.0",
+    "react-dom": "^18",
+    "react-icons": "^5.5.0",
+    "tar": "^7.4.3"
+  },
+  "devDependencies": {
+    "@types/dotenv": "^6.1.1",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-copy-to-clipboard": "^5.0.7",
+    "@types/react-dom": "^18",
+    "typescript": "^5"
+  }
+}
