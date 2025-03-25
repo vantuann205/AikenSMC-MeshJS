@@ -12,30 +12,25 @@ import {
   stringToHex,
 } from "@meshsdk/core";
 import { getScript, getTxBuilder, getUtxoByTxHash } from "./common";
-import blueprint from "../hello_word/plutus.json";
+import blueprint from "../helloworld-smc/plutus.json";
 import styles from "../styles/index.module.css";
 
 const Home: NextPage = () => {
-  const { wallet, connected, connect, disconnect } = useWallet();
-  const [walletAddress, setWalletAddress] = useState<string>("");
-  const [txHash, setTxHash] = useState<string>("");
-  const [unlockTxHash, setUnlockTxHash] = useState<string>("");
-  const [inputTxHash, setInputTxHash] = useState<string>("");
-  const [adaAmount, setAdaAmount] = useState<string>("10");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [status, setStatus] = useState<string>("");
+  const { wallet, connected, disconnect } = useWallet(); // Lấy thông tin ví từ MeshSDK
+  const [walletAddress, setWalletAddress] = useState<string>(""); // Lưu địa chỉ ví
+  const [txHash, setTxHash] = useState<string>(""); // Lưu hash giao dịch khóa
+  const [unlockTxHash, setUnlockTxHash] = useState<string>(""); // Lưu hash giao dịch mở khóa
+  const [inputTxHash, setInputTxHash] = useState<string>(""); // Lưu hash giao dịch cần mở khóa
+  const [adaAmount, setAdaAmount] = useState<string>("10"); // Số ADA muốn khóa, mặc định 10
+  const [loading, setLoading] = useState<boolean>(false); // Trạng thái đang xử lý
+  const [status, setStatus] = useState<string>(""); // Thông báo trạng thái giao dịch
 
-  useEffect(() => {
+  useEffect(() => { // Cập nhật địa chỉ ví khi kết nối thay đổi
     const fetchWalletAddress = async () => {
-      if (connected && wallet) {
-        try {
-          const address = await wallet.getChangeAddress();
-          setWalletAddress(address);
-        } catch (error) {
-          console.error("Error fetching wallet address:", error);
-          setStatus("Failed to fetch wallet address.");
-        }
-      } else {
+      if (connected && wallet) { // Nếu ví đã kết nối
+        const address = await wallet.getChangeAddress(); // Lấy địa chỉ ví
+        setWalletAddress(address);
+      } else { // Nếu ngắt kết nối, reset tất cả
         setWalletAddress("");
         setTxHash("");
         setUnlockTxHash("");
@@ -47,123 +42,99 @@ const Home: NextPage = () => {
     fetchWalletAddress();
   }, [connected, wallet]);
 
-  const handleCopy = (text: string) => {
-    setStatus(`Đã sao chép ${text.slice(0, 6)}... vào clipboard!`);
+  const handleCopy = (text: string) => { // Xử lý sao chép văn bản
+    setStatus(`Đã sao chép ${text.slice(0, 6)}... vào clipboard!`); // Hiển thị thông báo
     setTimeout(() => setStatus(""), 2000); // Xóa thông báo sau 2 giây
   };
 
-  async function lock() {
+  async function lock() { // Hàm khóa ADA vào script
     try {
-      setLoading(true);
+      setLoading(true); // Bật trạng thái đang xử lý
       setStatus("Đang khởi tạo giao dịch khóa...");
-
-      const lovelaceAmount = (parseFloat(adaAmount) * 1000000).toString();
-      if (isNaN(parseFloat(adaAmount)) || parseFloat(adaAmount) <= 0) {
+      const lovelaceAmount = (parseFloat(adaAmount) * 1000000).toString(); // Chuyển ADA thành lovelace
+      if (isNaN(parseFloat(adaAmount)) || parseFloat(adaAmount) <= 0) { // Kiểm tra số ADA hợp lệ
         throw new Error("Vui lòng nhập số lượng ADA hợp lệ");
       }
 
-      const assets: Asset[] = [
-        {
-          unit: "lovelace",
-          quantity: lovelaceAmount,
-        },
-      ];
-
-      const utxos = await wallet.getUtxos();
-      const walletAddress = (await wallet.getUsedAddresses())[0];
-      const { scriptAddr } = getScript(blueprint.validators[0].compiledCode);
-      const signerHash = deserializeAddress(walletAddress).pubKeyHash;
-
-      const txBuilder = getTxBuilder();
-      await txBuilder
-        .txOut(scriptAddr, assets)
-        .txOutDatumHashValue(mConStr0([signerHash]))
-        .changeAddress(walletAddress)
-        .selectUtxosFrom(utxos)
-        .setNetwork("preview")
+      const assets: Asset[] = [{ unit: "lovelace", quantity: lovelaceAmount }]; // Tạo danh sách tài sản (ADA)
+      const utxos = await wallet.getUtxos(); // Lấy danh sách UTxO từ ví
+      const walletAddress = (await wallet.getUsedAddresses())[0]; // Lấy địa chỉ ví đã dùng
+      const { scriptAddr } = getScript(blueprint.validators[0].compiledCode); // Lấy địa chỉ script từ blueprint
+      const signerHash = deserializeAddress(walletAddress).pubKeyHash; // Lấy hash khóa công khai
+      const txBuilder = getTxBuilder(); // Khởi tạo builder giao dịch
+      await txBuilder // Xây dựng giao dịch
+        .txOut(scriptAddr, assets) // Gửi ADA đến script
+        .txOutDatumHashValue(mConStr0([signerHash])) // Gắn datum (chủ sở hữu)
+        .changeAddress(walletAddress) // Địa chỉ nhận tiền thừa
+        .selectUtxosFrom(utxos) // Chọn UTxO để tiêu
+        .setNetwork("preview") // Đặt mạng là preview
         .complete();
 
-      const unsignedTx = txBuilder.txHex;
-      const signedTx = await wallet.signTx(unsignedTx);
-      const newTxHash = await wallet.submitTx(signedTx);
+      const unsignedTx = txBuilder.txHex; // Lấy giao dịch chưa ký
+      const signedTx = await wallet.signTx(unsignedTx); // Ký giao dịch
+      const newTxHash = await wallet.submitTx(signedTx); // Gửi giao dịch lên blockchain
 
-      setTxHash(newTxHash);
+      setTxHash(newTxHash); // Lưu hash giao dịch
       setStatus(`Khóa tiền thành công! Tx Hash: ${newTxHash}`);
     } catch (error) {
       console.error("Lock Error:", error);
       setStatus(`Lỗi khi khóa tiền: ${(error as Error).message}`);
     } finally {
-      setLoading(false);
+      setLoading(false); // Tắt trạng thái đang xử lý
     }
   }
 
-  async function unlock(txHashToUnlock: string) {
+  async function unlock(txHashToUnlock: string) { // Hàm mở khóa ADA từ script
     try {
-      setLoading(true);
+      setLoading(true); // Bật trạng thái đang xử lý
       setStatus("Đang khởi tạo giao dịch mở khóa...");
-
-      const message = "Hello, World!";
-      const utxo = await getUtxoByTxHash(txHashToUnlock);
-      if (!utxo) {
+      const message = "Hello, World!"; // Thông điệp cần khớp với validator
+      const utxo = await getUtxoByTxHash(txHashToUnlock); // Lấy UTxO từ hash giao dịch
+      if (!utxo) { // Kiểm tra UTxO tồn tại
         throw new Error("Không tìm thấy UTxO cho tx hash: " + txHashToUnlock);
       }
-      console.log("UTxO to unlock:", utxo);
 
-      const utxos = await wallet.getUtxos();
-      const walletAddress = (await wallet.getUsedAddresses())[0];
-      const collateral = (await wallet.getCollateral())[0];
-      if (!collateral) {
+      const utxos = await wallet.getUtxos(); // Lấy danh sách UTxO từ ví
+      const walletAddress = (await wallet.getUsedAddresses())[0]; // Lấy địa chỉ ví
+      const collateral = (await wallet.getCollateral())[0]; // Lấy UTxO làm collateral
+      if (!collateral) { // Kiểm tra collateral
         throw new Error("Không tìm thấy collateral. Vui lòng thiết lập collateral trong ví.");
       }
-      console.log("Collateral:", collateral);
 
-      const { scriptCbor } = getScript(blueprint.validators[0].compiledCode);
-      console.log("Script CBOR:", scriptCbor);
-      const signerHash = deserializeAddress(walletAddress).pubKeyHash;
-
-      const txBuilder = getTxBuilder();
-      await txBuilder
-        .spendingPlutusScript("V3")
-        .txIn(
-          utxo.input.txHash,
-          utxo.input.outputIndex,
-          utxo.output.amount,
-          utxo.output.address
-        )
-        .txInScript(scriptCbor)
-        .txInRedeemerValue(mConStr0([stringToHex(message)]))
-        .txInDatumValue(mConStr0([signerHash]))
-        .requiredSignerHash(signerHash)
-        .changeAddress(walletAddress)
-        .txInCollateral(
-          collateral.input.txHash,
-          collateral.input.outputIndex,
-          collateral.output.amount,
-          collateral.output.address
-        )
-        .selectUtxosFrom(utxos)
-        .setNetwork("preview")
+      const { scriptCbor } = getScript(blueprint.validators[0].compiledCode); // Lấy mã script CBOR
+      const signerHash = deserializeAddress(walletAddress).pubKeyHash; // Lấy hash khóa công khai
+      const txBuilder = getTxBuilder(); // Khởi tạo builder giao dịch
+      await txBuilder // Xây dựng giao dịch
+        .spendingPlutusScript("V3") // Sử dụng Plutus V3
+        .txIn(utxo.input.txHash, utxo.input.outputIndex, utxo.output.amount, utxo.output.address) // Tiêu UTxO từ script
+        .txInScript(scriptCbor) // Gắn script
+        .txInRedeemerValue(mConStr0([stringToHex(message)])) // Gắn redeemer (thông điệp "Hello, World!")
+        .txInDatumValue(mConStr0([signerHash])) // Gắn datum (chủ sở hữu)
+        .requiredSignerHash(signerHash) // Yêu cầu chữ ký từ chủ sở hữu
+        .changeAddress(walletAddress) // Địa chỉ nhận tiền
+        .txInCollateral(collateral.input.txHash, collateral.input.outputIndex, collateral.output.amount, collateral.output.address) // Gắn collateral
+        .selectUtxosFrom(utxos) // Chọn UTxO để tiêu
+        .setNetwork("preview") // Đặt mạng là preview
         .complete();
 
-      const unsignedTx = txBuilder.txHex;
-      console.log("Unsigned Tx:", unsignedTx);
-      const signedTx = await wallet.signTx(unsignedTx);
-      const newTxHash = await wallet.submitTx(signedTx);
+      const unsignedTx = txBuilder.txHex; // Lấy giao dịch chưa ký
+      const signedTx = await wallet.signTx(unsignedTx); // Ký giao dịch
+      const newTxHash = await wallet.submitTx(signedTx); // Gửi giao dịch lên blockchain
 
-      setUnlockTxHash(newTxHash);
+      setUnlockTxHash(newTxHash); // Lưu hash giao dịch
       setStatus(`Mở khóa tiền thành công! Tx Hash: ${newTxHash}`);
     } catch (error) {
       console.error("Unlock Error:", error);
       setStatus(`Lỗi khi mở khóa tiền: ${(error as Error).message}`);
     } finally {
-      setLoading(false);
+      setLoading(false); // Tắt trạng thái đang xử lý
     }
   }
 
   return (
     // Trong phần return của component Home
 <div className={styles.container}>
-  <h1 className={styles.title}>Kết nối ví</h1>
+  <h1 className={styles.title}>Hello World</h1>
   {!connected && (
     <div className={styles.walletWrapper}>
       <CardanoWallet />
