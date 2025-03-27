@@ -34,13 +34,12 @@
   background: linear-gradient(90deg, #00ddeb, #ff00cc);
   border: none;
   border-radius: 8px;
-  padding: 0.6rem 1.5rem; /* Thu nhỏ padding để nút nhỏ hơn */
-  font-size: 1rem; /* Giảm font-size một chút */
+  padding: 0.6rem 1.5rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #ffffff;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  margin: 1rem 0 0 10px; /* Chỉ giữ margin trái để cách input */
 }
 
 .actionButton:hover:not(:disabled) {
@@ -62,7 +61,7 @@
   font-size: 1rem;
   color: #ffffff;
   width: 100%;
-  max-width: 300px; /* Giảm max-width để input ngắn hơn, tạo không gian cho nút */
+  max-width: 300px;
   transition: border-color 0.2s ease;
 }
 
@@ -78,7 +77,7 @@
 
 .txHash {
   font-size: 1rem;
-  margin: 1rem 0 0 0; /* Giảm margin-top để gọn hơn */
+  margin: 1rem 0 0 0;
   word-break: break-all;
   color: #d0d0d0;
 }
@@ -103,7 +102,6 @@
   margin: 1rem 0;
 }
 
-/* Style nút Connect Wallet trước khi kết nối */
 .walletWrapper button {
   background: linear-gradient(90deg, #00ddeb, #ff00cc);
   border: none;
@@ -121,16 +119,14 @@
   box-shadow: 0 4px 12px rgba(0, 221, 235, 0.5), 0 4px 12px rgba(255, 0, 204, 0.5);
 }
 
-/* Copy button */
 .addressContainer {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 1rem 0 0 0; /* Điều chỉnh margin cho đồng bộ */
+  margin: 1rem 0 0 0;
 }
 
 .copyIcon {
-  margin-top: 1rem; /* Xóa margin-top để căn giữa với txHash */
   cursor: pointer;
   color: #666;
   font-size: 16px;
@@ -141,12 +137,13 @@
   color: #000;
 }
 
-/* Container cho input và button nằm ngang */
+/* Container cho input và button xếp dọc */
 .inputButtonContainer {
   display: flex;
-  align-items: center;
-  gap: 10px; /* Khoảng cách giữa input và button */
+  flex-direction: column; /* Xếp dọc */
+  align-items: center; /* Căn giữa theo chiều ngang */
+  gap: 15px; /* Khoảng cách giữa các phần tử */
   margin: 0.5rem 0;
   width: 100%;
-  max-width: 400px; /* Giữ đồng bộ với max-width ban đầu */
+  max-width: 400px;
 }

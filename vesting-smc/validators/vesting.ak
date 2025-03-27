@@ -10,8 +10,8 @@ fn key_signed(transaction: Transaction, vk: VerificationKeyHash) -> Bool {
 
 // Hàm kiểm tra thời gian hợp lệ
 fn valid_after(range: ValidityRange, lock_until) -> Bool {
-    when range.upper_bound.bound_type is { // Xem xét giới hạn trên của khoảng thời gian giao dịch
-        Finite(tx_earliest_time) -> lock_until <= tx_earliest_time // Nếu có thời gian cụ thể, kiểm tra lock_until nhỏ hơn hoặc bằng thời gian sớm nhất
+    when range.lower_bound.bound_type is { // Xem xét giới hạn dưới của khoảng thời gian giao dịch
+        Finite(tx_start_time) -> lock_until <= tx_start_time // Nếu có thời gian cụ thể, kiểm tra lock_until nhỏ hơn hoặc bằng thời gian sớm nhất
         _ -> False // Nếu không có giới hạn cụ thể (vô hạn hoặc khác), trả về False
     }
 }
