@@ -14,6 +14,9 @@ function MyApp({ Component, pageProps }: AppProps) {
         display: "flex",
         gap: "1rem",
       }}>
+        <Link href="/transaction" style={{ color: "white", textDecoration: "none" }}>
+        Transaction Basic
+        </Link>
         <Link href="/" style={{ color: "white", textDecoration: "none" }}>
           Hello World
         </Link>

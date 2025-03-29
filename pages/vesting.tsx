@@ -19,153 +19,164 @@ import { getScript, getTxBuilder, getUtxoByTxHash } from "./common";
 import blueprint from "../vesting-smc/plutus.json";
 import styles from "../styles/index.module.css";
 
-export type VestingDatum = ConStr0<[Integer, BuiltinByteString, BuiltinByteString]>; // Định nghĩa kiểu dữ liệu cho datum của hợp đồng vesting, gồm thời gian khóa (Integer), hash của owner và beneficiary (BuiltinByteString)
+export type VestingDatum = ConStr0<[Integer, BuiltinByteString, BuiltinByteString]>;
 
-const VestingPage: NextPage = () => { // Khai báo component React là một trang Next.js
-  const { wallet, connected, disconnect } = useWallet(); // Lấy thông tin ví từ hook useWallet: đối tượng ví, trạng thái kết nối, và hàm ngắt kết nối
-  const [walletAddress, setWalletAddress] = useState<string>(""); // State lưu địa chỉ ví, ban đầu rỗng
-  const [txHash, setTxHash] = useState<string>(""); // State lưu mã giao dịch khi khóa ADA, ban đầu rỗng
-  const [unlockTxHash, setUnlockTxHash] = useState<string>(""); // State lưu mã giao dịch khi mở khóa ADA, ban đầu rỗng
-  const [inputTxHash, setInputTxHash] = useState<string>(""); // State lưu mã giao dịch đầu vào để mở khóa, ban đầu rỗng
-  const [adaAmount, setAdaAmount] = useState<string>("10"); // State lưu số lượng ADA muốn khóa, mặc định là 10
-  const [lockUntilDate, setLockUntilDate] = useState<string>(""); // State lưu thời gian khóa (chuỗi datetime-local), ban đầu rỗng
-  const [beneficiaryAddress, setBeneficiaryAddress] = useState<string>(""); // State lưu địa chỉ người thụ hưởng, ban đầu rỗng
-  const [loading, setLoading] = useState<boolean>(false); // State kiểm soát trạng thái đang xử lý, ban đầu là false
-  const [status, setStatus] = useState<string>(""); // State lưu thông báo trạng thái cho người dùng, ban đầu rỗng
+const VestingPage: NextPage = () => {
+  const { wallet, connected, disconnect } = useWallet();
+  const [walletAddress, setWalletAddress] = useState<string>("");
+  const [txHash, setTxHash] = useState<string>("");
+  const [unlockTxHash, setUnlockTxHash] = useState<string>("");
+  const [inputTxHash, setInputTxHash] = useState<string>("");
+  const [adaAmount, setAdaAmount] = useState<string>("10");
+  const [lockUntilDate, setLockUntilDate] = useState<string>(""); // Thời gian khóa theo định dạng datetime-local
+  const [beneficiaryAddress, setBeneficiaryAddress] = useState<string>(""); // Địa chỉ beneficiary
+  const [loading, setLoading] = useState<boolean>(false);
+  const [status, setStatus] = useState<string>("");
 
-  useEffect(() => { // Hook useEffect chạy khi connected hoặc wallet thay đổi
-    const fetchWalletAddress = async () => { // Hàm bất đồng bộ để lấy địa chỉ ví
-      if (connected && wallet) { // Kiểm tra nếu ví đã kết nối và tồn tại
-        const address = await wallet.getChangeAddress(); // Lấy địa chỉ ví từ hàm getChangeAddress
-        setWalletAddress(address); // Cập nhật state walletAddress với địa chỉ vừa lấy
-      } else { // Nếu ví không kết nối
-        setWalletAddress(""); // Reset địa chỉ ví về rỗng
-        setTxHash(""); // Reset mã giao dịch khóa về rỗng
-        setUnlockTxHash(""); // Reset mã giao dịch mở khóa về rỗng
-        setInputTxHash(""); // Reset mã giao dịch đầu vào về rỗng
-        setAdaAmount("10"); // Reset số lượng ADA về 10
-        setLockUntilDate(""); // Reset thời gian khóa về rỗng
-        setBeneficiaryAddress(""); // Reset địa chỉ người thụ hưởng về rỗng
-        setStatus(""); // Reset thông báo trạng thái về rỗng
+  useEffect(() => {
+    const fetchWalletAddress = async () => {
+      if (connected && wallet) {
+        const address = await wallet.getChangeAddress();
+        setWalletAddress(address);
+      } else {
+        setWalletAddress("");
+        setTxHash("");
+        setUnlockTxHash("");
+        setInputTxHash("");
+        setAdaAmount("10");
+        setLockUntilDate(""); // Reset thời gian khóa
+        setBeneficiaryAddress(""); // Reset địa chỉ beneficiary
+        setStatus("");
       }
     };
-    fetchWalletAddress(); // Gọi hàm fetchWalletAddress để thực thi
-  }, [connected, wallet]); // Dependency array: chạy lại khi connected hoặc wallet thay đổi
+    fetchWalletAddress();
+  }, [connected, wallet]);
 
-  const handleCopy = (text: string) => { // Hàm sao chép chuỗi vào clipboard
-    setStatus(`Đã sao chép ${text.slice(0, 6)}... vào clipboard!`); // Hiển thị thông báo với 6 ký tự đầu của chuỗi
-    setTimeout(() => setStatus(""), 2000); // Xóa thông báo sau 2 giây
+  const handleCopy = (text: string) => {
+    setStatus(`Đã sao chép ${text.slice(0, 6)}... vào clipboard!`);
+    setTimeout(() => setStatus(""), 2000);
   };
 
-  async function lockVesting(adaAmount: string, lockUntil: string, beneficiary: string) { // Hàm khóa ADA vào hợp đồng vesting, nhận 3 tham số
-    try { // Bắt đầu khối try để xử lý lỗi
-      setLoading(true); // Bật trạng thái đang xử lý
-      setStatus("Đang khởi tạo giao dịch khóa vesting..."); // Hiển thị thông báo đang khởi tạo giao dịch
+  async function lockVesting(adaAmount: string, lockUntil: string, beneficiary: string) {
+    try {
+      setLoading(true);
+      setStatus("Đang khởi tạo giao dịch khóa vesting...");
 
-      const lovelaceAmount = (parseFloat(adaAmount) * 1000000).toString(); // Chuyển ADA thành Lovelace (1 ADA = 1,000,000 Lovelace) và thành chuỗi
-      if (isNaN(parseFloat(adaAmount)) || parseFloat(adaAmount) <= 0) { // Kiểm tra nếu số ADA không hợp lệ hoặc nhỏ hơn 0
-        throw new Error("Vui lòng nhập số lượng ADA hợp lệ"); // Ném lỗi với thông báo
+      const lovelaceAmount = (parseFloat(adaAmount) * 1000000).toString();
+      if (isNaN(parseFloat(adaAmount)) || parseFloat(adaAmount) <= 0) {
+        throw new Error("Vui lòng nhập số lượng ADA hợp lệ");
       }
-      if (!lockUntil) { // Kiểm tra nếu thời gian khóa rỗng
-        throw new Error("Vui lòng chọn thời gian khóa"); // Ném lỗi với thông báo
+      if (!lockUntil) {
+        throw new Error("Vui lòng chọn thời gian khóa");
       }
-      if (!beneficiary || !beneficiary.startsWith("addr")) { // Kiểm tra nếu địa chỉ người thụ hưởng rỗng hoặc không bắt đầu bằng "addr"
-        throw new Error("Vui lòng nhập địa chỉ beneficiary hợp lệ"); // Ném lỗi với thông báo
-      }
-
-      const assets: Asset[] = [{ unit: "lovelace", quantity: lovelaceAmount }]; // Tạo mảng assets chứa số Lovelace sẽ khóa
-      const utxos = await wallet.getUtxos(); // Lấy danh sách UTXO từ ví để chi tiêu
-      const walletAddress = (await wallet.getUsedAddresses())[0]; // Lấy địa chỉ ví đầu tiên từ danh sách địa chỉ đã dùng
-      const { scriptAddr } = getScript(blueprint.validators[0].compiledCode); // Lấy địa chỉ hợp đồng thông minh từ mã đã biên dịch
-      const { pubKeyHash: ownerPubKeyHash } = deserializeAddress(walletAddress); // Lấy hash khóa công khai của chủ sở hữu từ địa chỉ ví
-      const { pubKeyHash: beneficiaryPubKeyHash } = deserializeAddress(beneficiary); // Lấy hash khóa công khai của người thụ hưởng từ địa chỉ
-      const lockUntilTimestamp = new Date(lockUntil).getTime(); // Chuyển thời gian khóa từ chuỗi thành timestamp (mili giây)
-      const currentTime = Date.now(); // Lấy thời gian hiện tại (mili giây)
-      if (lockUntilTimestamp <= currentTime) { // Kiểm tra nếu thời gian khóa không ở tương lai
-        throw new Error("Thời gian khóa phải ở tương lai"); // Ném lỗi với thông báo
+      if (!beneficiary || !beneficiary.startsWith("addr")) {
+        throw new Error("Vui lòng nhập địa chỉ beneficiary hợp lệ");
       }
 
-      const txBuilder = getTxBuilder(); // Tạo một đối tượng txBuilder để xây dựng giao dịch
-      await txBuilder // Bắt đầu cấu hình giao dịch
-        .txOut(scriptAddr, assets) // Thêm đầu ra: gửi số Lovelace đến địa chỉ hợp đồng
-        .txOutInlineDatumValue(mConStr0([lockUntilTimestamp, ownerPubKeyHash, beneficiaryPubKeyHash])) // Gắn dữ liệu inline (datum) chứa thời gian khóa, hash của owner và beneficiary
-        .changeAddress(walletAddress) // Đặt địa chỉ nhận tiền thừa (change)
-        .selectUtxosFrom(utxos) // Chọn UTXO từ danh sách để chi tiêu
-        .setNetwork("preprod") // Đặt mạng blockchain là "preprod" (mạng thử nghiệm Cardano)
-        .complete(); // Hoàn tất việc xây dựng giao dịch
+      const assets: Asset[] = [{ unit: "lovelace", quantity: lovelaceAmount }];
+      const utxos = await wallet.getUtxos();
+      const walletAddress = (await wallet.getUsedAddresses())[0];
+      const { scriptAddr } = getScript(blueprint.validators[0].compiledCode);
+      const { pubKeyHash: ownerPubKeyHash } = deserializeAddress(walletAddress);
+      const { pubKeyHash: beneficiaryPubKeyHash } = deserializeAddress(beneficiary);
+      const lockUntilTimestamp = new Date(lockUntil).getTime(); // Chuyển datetime-local thành timestamp (ms)
+      const currentTime = Date.now();
+      if (lockUntilTimestamp <= currentTime) {
+        throw new Error("Thời gian khóa phải ở tương lai");
+      }
 
-      const unsignedTx = txBuilder.txHex; // Lấy giao dịch chưa ký dưới dạng hex
-      const signedTx = await wallet.signTx(unsignedTx); // Ký giao dịch bằng ví
-      const newTxHash = await wallet.submitTx(signedTx); // Gửi giao dịch đã ký lên blockchain và nhận mã giao dịch
+      const txBuilder = getTxBuilder();
+      await txBuilder
+        .txOut(scriptAddr, assets)
+        .txOutInlineDatumValue(mConStr0([lockUntilTimestamp, ownerPubKeyHash, beneficiaryPubKeyHash]))
+        .changeAddress(walletAddress)
+        .selectUtxosFrom(utxos)
+        .setNetwork("preprod")
+        .complete();
 
-      setTxHash(newTxHash); // Cập nhật state txHash với mã giao dịch mới
-      setStatus(`Khóa vesting thành công! Tx Hash: ${newTxHash}`); // Hiển thị thông báo thành công với mã giao dịch
-    } catch (error) { // Xử lý lỗi nếu xảy ra
-      console.error("Lock Vesting Error:", error); // Ghi log lỗi ra console
-      setStatus(`Lỗi khi khóa vesting: ${(error as Error).message}`); // Hiển thị thông báo lỗi
-    } finally { // Khối finally luôn chạy dù thành công hay thất bại
-      setLoading(false); // Tắt trạng thái đang xử lý
+      const unsignedTx = txBuilder.txHex;
+      const signedTx = await wallet.signTx(unsignedTx);
+      const newTxHash = await wallet.submitTx(signedTx);
+
+      setTxHash(newTxHash);
+      setStatus(`Khóa vesting thành công! Tx Hash: ${newTxHash}`);
+    } catch (error) {
+      console.error("Lock Vesting Error:", error);
+      setStatus(`Lỗi khi khóa vesting: ${(error as Error).message}`);
+    } finally {
+      setLoading(false);
     }
   }
 
-  async function unlockVesting(txHashToUnlock: string) { // Hàm mở khóa ADA từ hợp đồng, nhận mã giao dịch đã khóa
-    try { // Bắt đầu khối try để xử lý lỗi
-      setLoading(true); // Bật trạng thái đang xử lý
-      setStatus("Đang mở khóa vesting..."); // Hiển thị thông báo đang mở khóa
-
-      const utxo = await getUtxoByTxHash(txHashToUnlock); // Lấy thông tin UTXO từ mã giao dịch đã khóa
-      const utxos = await wallet.getUtxos(); // Lấy danh sách UTXO từ ví để chi tiêu
-      const walletAddress = (await wallet.getUsedAddresses())[0]; // Lấy địa chỉ ví đầu tiên từ danh sách địa chỉ đã dùng
-      const collateral = (await wallet.getCollateral())[0]; // Lấy UTXO dùng làm collateral (tài sản thế chấp)
-      if (!collateral) throw new Error("Không tìm thấy collateral."); // Nếu không có collateral, ném lỗi
-
-      const datum = deserializeDatum<VestingDatum>(utxo.output.plutusData!); // Phân tích dữ liệu datum từ UTXO
-      const lockUntil = datum.fields[0].int as number; // Lấy thời gian khóa từ datum (trường đầu tiên)
-      const ownerPubKeyHash = datum.fields[1].bytes; // Lấy hash của owner từ datum (trường thứ hai)
-      const beneficiaryPubKeyHash = datum.fields[2].bytes; // Lấy hash của beneficiary từ datum (trường thứ ba)
-      const { scriptCbor } = getScript(blueprint.validators[0].compiledCode); // Lấy mã hợp đồng thông minh (dạng CBOR)
-
-      const currentTime = Date.now(); // Lấy thời gian hiện tại (mili giây)
-      const currentSlot = unixTimeToEnclosingSlot(currentTime, SLOT_CONFIG_NETWORK.preprod) + 450; // Chuyển thời gian hiện tại thành slot, cộng thêm 200 để đảm bảo an toàn
-      const lockUntilSlot = unixTimeToEnclosingSlot(lockUntil, SLOT_CONFIG_NETWORK.preprod); // Chuyển thời gian khóa thành slot
-      const { pubKeyHash: signerPubKeyHash } = deserializeAddress(walletAddress); // Lấy hash khóa công khai của người ký giao dịch
-
-      const isOwner = signerPubKeyHash === ownerPubKeyHash; // Kiểm tra nếu người ký là owner
-      const isBeneficiary = signerPubKeyHash === beneficiaryPubKeyHash; // Kiểm tra nếu người ký là beneficiary
-
-      if (isBeneficiary && currentTime <= lockUntil) { // Nếu là beneficiary và chưa đến thời gian khóa
-        throw new Error(`Chưa đến thời gian mở khóa! Lock until: ${new Date(lockUntil).toLocaleString()}`); // Ném lỗi với thông báo thời gian
+  async function unlockVesting(txHashToUnlock: string) {
+    try {
+      setLoading(true);
+      setStatus("Đang mở khóa vesting...");
+  
+      const utxo = await getUtxoByTxHash(txHashToUnlock);
+      const utxos = await wallet.getUtxos();
+      const walletAddress = (await wallet.getUsedAddresses())[0];
+      const collateral = (await wallet.getCollateral())[0];
+      if (!collateral) throw new Error("Không tìm thấy collateral.");
+  
+      const datum = deserializeDatum<VestingDatum>(utxo.output.plutusData!);
+      const lockUntil = datum.fields[0].int as number; // Thời gian khóa
+      const ownerPubKeyHash = datum.fields[1].bytes;   // Hash của owner
+      const beneficiaryPubKeyHash = datum.fields[2].bytes; // Hash của beneficiary
+      const { scriptCbor } = getScript(blueprint.validators[0].compiledCode);
+  
+      const currentTime = Date.now();
+      const currentSlot = unixTimeToEnclosingSlot(currentTime, SLOT_CONFIG_NETWORK.preprod);
+      const lockUntilSlot = unixTimeToEnclosingSlot(lockUntil, SLOT_CONFIG_NETWORK.preprod);
+  
+      const { pubKeyHash: signerPubKeyHash } = deserializeAddress(walletAddress);
+  
+      // Kiểm tra xem signer là owner hay beneficiary
+      const isOwner = signerPubKeyHash === ownerPubKeyHash;
+      const isBeneficiary = signerPubKeyHash === beneficiaryPubKeyHash;  
+      // Chỉ kiểm tra thời gian nếu signer là beneficiary
+      if (isBeneficiary && currentTime <= lockUntil) {
+        throw new Error(`Chưa đến thời gian mở khóa! Lock until: ${new Date(lockUntil).toLocaleString()}`);
       }
-
-      const txBuilder = getTxBuilder(); // Tạo đối tượng txBuilder để xây dựng giao dịch
-      if (isBeneficiary) { // Nếu người ký là beneficiary
-        txBuilder.invalidBefore(lockUntilSlot); // Đặt điều kiện giao dịch chỉ hợp lệ sau slot khóa
+  
+      console.log("Current Time:", new Date(currentTime).toLocaleString());
+      console.log("Lock Until:", new Date(lockUntil).toLocaleString());
+      console.log("Current Slot:", currentSlot);
+      console.log("Lock Until Slot:", lockUntilSlot);
+      console.log("Signer:", signerPubKeyHash);
+      console.log("Owner:", ownerPubKeyHash);
+      console.log("Beneficiary:", beneficiaryPubKeyHash);
+      const txBuilder = getTxBuilder();
+      if (isBeneficiary) {
+        txBuilder.invalidBefore(lockUntilSlot); // Yêu cầu slot hiện tại >= lockUntilSlot
       }
-      await txBuilder // Bắt đầu cấu hình giao dịch
-        .spendingPlutusScript("V3") // Chỉ định đây là giao dịch chi tiêu từ hợp đồng Plutus phiên bản V3
-        .txIn(utxo.input.txHash, utxo.input.outputIndex, utxo.output.amount, utxo.output.address) // Thêm đầu vào từ UTXO đã khóa
-        .spendingReferenceTxInInlineDatumPresent() // Xác nhận có dữ liệu inline trong đầu vào
-        .spendingReferenceTxInRedeemerValue(mConStr0([])) // Gắn redeemer (điều kiện mở khóa, ở đây là rỗng)
-        .txInScript(scriptCbor) // Gắn mã hợp đồng thông minh
-        // .invalidHereafter(currentSlot + 100000) // Đặt giới hạn thời gian giao dịch (hết hạn sau currentSlot + 100000)
-        .requiredSignerHash(signerPubKeyHash) // Yêu cầu chữ ký của người gửi
-        .changeAddress(walletAddress) // Đặt địa chỉ nhận tiền thừa
-        .txInCollateral(collateral.input.txHash, collateral.input.outputIndex, collateral.output.amount, collateral.output.address) // Thêm collateral vào giao dịch
-        .selectUtxosFrom(utxos) // Chọn UTXO từ danh sách để chi tiêu
-        .setNetwork("preprod") // Đặt mạng blockchain là "preprod"
-        .complete(); // Hoàn tất việc xây dựng giao dịch
-
-      const unsignedTx = txBuilder.txHex; // Lấy giao dịch chưa ký dưới dạng hex
-      const signedTx = await wallet.signTx(unsignedTx); // Ký giao dịch bằng ví
-      const newTxHash = await wallet.submitTx(signedTx); // Gửi giao dịch đã ký lên blockchain và nhận mã giao dịch
-
-      setUnlockTxHash(newTxHash); // Cập nhật state unlockTxHash với mã giao dịch mới
-      setStatus(`Mở khóa thành công! Tx Hash: ${newTxHash}`); // Hiển thị thông báo thành công với mã giao dịch
-    } catch (error) { // Xử lý lỗi nếu xảy ra
-      console.error("Unlock Vesting Error:", error); // Ghi log lỗi ra console
-      setStatus(`Lỗi khi mở khóa: ${(error as Error).message}`); // Hiển thị thông báo lỗi
-    } finally { // Khối finally luôn chạy dù thành công hay thất bại
-      setLoading(false); // Tắt trạng thái đang xử lý
+      await txBuilder
+        .spendingPlutusScript("V3")
+        .txIn(utxo.input.txHash, utxo.input.outputIndex, utxo.output.amount, utxo.output.address)
+        .spendingReferenceTxInInlineDatumPresent()
+        .spendingReferenceTxInRedeemerValue(mConStr0([]))
+        .txInScript(scriptCbor)
+        .invalidHereafter(currentSlot + 100000) // Giới hạn upper bound
+        .requiredSignerHash(signerPubKeyHash)
+        .changeAddress(walletAddress)
+        .txInCollateral(collateral.input.txHash, collateral.input.outputIndex, collateral.output.amount, collateral.output.address)
+        .selectUtxosFrom(utxos)
+        .setNetwork("preprod")
+        .complete();
+  
+      const unsignedTx = txBuilder.txHex;
+      console.log("Unsigned Tx:", unsignedTx);
+      const signedTx = await wallet.signTx(unsignedTx);
+      console.log("Signed Tx:", signedTx);
+      const newTxHash = await wallet.submitTx(signedTx);
+  
+      setUnlockTxHash(newTxHash);
+      setStatus(`Mở khóa thành công! Tx Hash: ${newTxHash}`);
+    } catch (error) {
+      console.error("Unlock Vesting Error:", error);
+      setStatus(`Lỗi khi mở khóa: ${(error as Error).message}`);
+    } finally {
+      setLoading(false);
     }
   }
 
