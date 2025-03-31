@@ -6,8 +6,14 @@ import {
 } from "@meshsdk/core";
 import { applyParamsToScript } from "@meshsdk/core-cst";
 
-const blockchainProvider = new BlockfrostProvider("preprodMocjU0xsBBRrDqhzCADAzEJWH7hXirlh");
+const blockchainProvider = new BlockfrostProvider("preprodNCrPaDqdsCHvUf2uYbqb67R3Z5GP5ycR");
 // Tạo provider kết nối blockchain Cardano qua Blockfrost, dùng mạng preprod với API key.
+
+export function getProvider() {
+  return blockchainProvider; // Trả về provider đã khởi tạo
+}
+
+
 
 export function getScript(
   blueprintCompiledCode: string, // Mã script đã biên dịch từ blueprint

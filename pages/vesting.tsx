@@ -205,6 +205,7 @@ const VestingPage: NextPage = () => {
             onClick={async () => {
               try {
                 await disconnect();
+                setWalletAddress('');
                 setStatus("Kết nối ví thành công.");
               } catch (error) {
                 console.error("Disconnect Error:", error);

@@ -11,10 +11,10 @@
     "unlock": "npx tsx src/unlock-assets.ts"
   },
   "dependencies": {
-    "@meshsdk/contract": "^1.7.20",
-    "@meshsdk/core": "^1.5.25",
+    "@meshsdk/contract": "^1.9.0-beta.23",
+    "@meshsdk/core": "^1.9.0-beta.23",
     "@meshsdk/core-cst": "^1.9.0-beta.20",
-    "@meshsdk/react": "^1.1.12",
+    "@meshsdk/react": "^1.9.0-beta.23",
     "axios": "^1.7.5",
     "cbor-x": "^1.6.0",
     "dotenv": "^16.4.7",
