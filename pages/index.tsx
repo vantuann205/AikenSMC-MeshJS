@@ -11,7 +11,7 @@ import {
   mConStr0,
   stringToHex,
 } from "@meshsdk/core";
-import { getScript, getTxBuilder, getUtxoByTxHash } from "./common";
+import { getScript, getTxBuilder, getUtxoByTxHash } from "../utils/common";
 import blueprint from "../helloworld-smc/plutus.json";
 import styles from "../styles/index.module.css";
 

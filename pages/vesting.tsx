@@ -15,7 +15,7 @@ import {
   unixTimeToEnclosingSlot,
   SLOT_CONFIG_NETWORK,
 } from "@meshsdk/core";
-import { getScript, getTxBuilder, getUtxoByTxHash } from "./common";
+import { getScript, getTxBuilder, getUtxoByTxHash } from "../utils/common";
 import blueprint from "../vesting-smc/plutus.json";
 import styles from "../styles/index.module.css";
 

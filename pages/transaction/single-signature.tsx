@@ -3,8 +3,8 @@ import type { NextPage } from 'next';
 import { useWallet, CardanoWallet } from '@meshsdk/react';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { FaCopy } from 'react-icons/fa';
-import { getScript, getTxBuilder, getUtxoByTxHash } from '../common';
-import styles from '../../styles/index.module.css';
+import { getScript, getTxBuilder, getUtxoByTxHash } from '../../utils/common';
+import styles from '../transaction/styles/index.module.css';
 
 const TransferADAPage: NextPage = () => {
   const { wallet, connected, disconnect } = useWallet();
@@ -84,7 +84,7 @@ const TransferADAPage: NextPage = () => {
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>Giao dịch Sent ADA đơn chữ kí</h1>
+      <h1 className={styles.title}>Transfer ADA Single-Sign</h1>
       {!connected && (
         <div className={styles.walletWrapper}>
           <CardanoWallet />
