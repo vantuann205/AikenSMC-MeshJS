@@ -4,7 +4,7 @@ import { useWallet, CardanoWallet } from '@meshsdk/react';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { FaCopy } from 'react-icons/fa';
 import { getScript, getTxBuilder, getUtxoByTxHash } from '../../utils/common';
-import styles from '../transaction/styles/index.module.css';
+import styles from '../../styles/index.module.css';
 
 const TransferADAPage: NextPage = () => {
   const { wallet, connected, disconnect } = useWallet();
