@@ -1,0 +1,91 @@
+{
+  "preamble": {
+    "title": "aiken-lang/nft-smc",
+    "description": "Aiken contracts for project 'aiken-lang/nft-smc'",
+    "version": "0.0.0",
+    "plutusVersion": "v3",
+    "compiler": {
+      "name": "Aiken",
+      "version": "v1.1.5+a7741ec"
+    },
+    "license": "Apache-2.0"
+  },
+  "validators": [
+    {
+      "title": "nft.one_shot_mint.mint",
+      "redeemer": {
+        "title": "_redeemer",
+        "schema": {
+          "$ref": "#/definitions/nft~1Action"
+        }
+      },
+      "parameters": [
+        {
+          "title": "required_utxo",
+          "schema": {
+            "$ref": "#/definitions/cardano~1transaction~1OutputReference"
+          }
+        }
+      ],
+      "compiledCode": "59015601010032323232323232225333003323232323253330083370e900018049baa00113253330093370e900018051baa0031533300c300b37540062646464a66601864660020026eb0c048010894ccc044004528099299980799baf301430113754602800401c29444cc00c00c004c050004400452829998070008a50132533300f30120021533300c3370e90011bad300e301100214a20020022940c94ccc02ccdc3a400460186ea800452f5bded8c026eacc040c034dd500099198008009bab3010301130113011301100222533300f00114c0103d87a80001323232325333010337220100042a66602066e3c0200084cdd2a4000660286e980052f5c02980103d87a8000133006006003375660220066eb8c03c008c04c008c044004c02cdd50028b0b1bae300d300a37540022c6018601a004601600260160046012002600a6ea8004526136565734aae7555cf2ab9f5740ae855d11",
+      "hash": "7c092a358278325c3de388bee6e91a32dbd5d5c579741cf62a45b994"
+    },
+    {
+      "title": "nft.one_shot_mint.else",
+      "redeemer": {
+        "schema": {}
+      },
+      "parameters": [
+        {
+          "title": "required_utxo",
+          "schema": {
+            "$ref": "#/definitions/cardano~1transaction~1OutputReference"
+          }
+        }
+      ],
+      "compiledCode": "59015601010032323232323232225333003323232323253330083370e900018049baa00113253330093370e900018051baa0031533300c300b37540062646464a66601864660020026eb0c048010894ccc044004528099299980799baf301430113754602800401c29444cc00c00c004c050004400452829998070008a50132533300f30120021533300c3370e90011bad300e301100214a20020022940c94ccc02ccdc3a400460186ea800452f5bded8c026eacc040c034dd500099198008009bab3010301130113011301100222533300f00114c0103d87a80001323232325333010337220100042a66602066e3c0200084cdd2a4000660286e980052f5c02980103d87a8000133006006003375660220066eb8c03c008c04c008c044004c02cdd50028b0b1bae300d300a37540022c6018601a004601600260160046012002600a6ea8004526136565734aae7555cf2ab9f5740ae855d11",
+      "hash": "7c092a358278325c3de388bee6e91a32dbd5d5c579741cf62a45b994"
+    }
+  ],
+  "definitions": {
+    "ByteArray": {
+      "title": "ByteArray",
+      "dataType": "bytes"
+    },
+    "Int": {
+      "dataType": "integer"
+    },
+    "cardano/transaction/OutputReference": {
+      "title": "OutputReference",
+      "description": "An `OutputReference` is a unique reference to an output on-chain. The `output_index`\n corresponds to the position in the output list of the transaction (identified by its id)\n that produced that output",
+      "anyOf": [
+        {
+          "title": "OutputReference",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "transaction_id",
+              "$ref": "#/definitions/ByteArray"
+            },
+            {
+              "title": "output_index",
+              "$ref": "#/definitions/Int"
+            }
+          ]
+        }
+      ]
+    },
+    "nft/Action": {
+      "title": "Action",
+      "anyOf": [
+        {
+          "title": "Mint",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        }
+      ]
+    }
+  }
+}

@@ -1,26 +1,31 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import type { NextPage } from "next";
 import { useWallet, CardanoWallet } from "@meshsdk/react";
 import { CopyToClipboard } from "react-copy-to-clipboard";
 import { FaCopy } from "react-icons/fa";
-import { MeshTxBuilder, NativeScript, deserializeAddress, serializeNativeScript } from "@meshsdk/core";
+import { MeshTxBuilder, NativeScript, deserializeAddress, serializeNativeScript, keepRelevant } from "@meshsdk/core";
 import { getTxBuilder, getProvider } from "../../utils/common";
+import { useRouter } from "next/router";
 import styles from "../../styles/index.module.css";
 
 const fixedAddress1 = "addr_test1qrn4fuvpnrhttvwuq5z0733aa9tk82pjqg9rlzva9n7t04ra0a8k5yqyw3583j9ah206l94kxqfr50asuqqesw39x65st8lzp8"; // Ví 1
 const fixedAddress2 = "addr_test1qpwm26gaq0zk7a43dte25msfan5jvy6c3gpr9qennesrkkxvywm3xn8zjjwmg6el4hwda8x4y6c368j5839d8vfrwj3qv44pnn"; // Ví 2
 
-const MultipleSignaturePage: NextPage = () => {
+const MultisigWalletPage: NextPage = () => {
   const { wallet, connected, disconnect } = useWallet();
   const [walletAddress, setWalletAddress] = useState<string>("");
+  const [scriptAddress, setScriptAddress] = useState<string>("");
   const [txHash, setTxHash] = useState<string>("");
-  const [adaAmount, setAdaAmount] = useState<string>("10");
-  const [fundAmount, setFundAmount] = useState<string>("15");
-  const [recipientAddress, setRecipientAddress] = useState<string>("");
+  const [signedTx1, setSignedTx1] = useState<string>("");
+  const [utxos, setUtxos] = useState<any[]>([]);
+  const [selectedUtxoCount, setSelectedUtxoCount] = useState<number>(3);
+  const [amounts, setAmounts] = useState<string[]>(["100", "100", "100"]); // For deposit
+  const [recipientAddresses, setRecipientAddresses] = useState<string[]>([""]);
+  const [transferAmounts, setTransferAmounts] = useState<string[]>(["10"]);
+  const [assets, setAssets] = useState<string[]>(["ADA"]);
   const [loading, setLoading] = useState<boolean>(false);
   const [status, setStatus] = useState<string>("");
-  const [scriptAddress, setScriptAddress] = useState<string>("");
-  const [signedTx1, setSignedTx1] = useState<string>(""); // Lưu signedTx từ ví 1
+  const router = useRouter();
 
   const convertToLovelace = (ada: string): string => {
     const adaNum = parseFloat(ada);
@@ -32,7 +37,9 @@ const MultipleSignaturePage: NextPage = () => {
     try {
       if (connected && wallet) {
         const address = await wallet.getChangeAddress();
+        const utxos = await wallet.getUtxos();
         setWalletAddress(address);
+        setUtxos(utxos);
         setStatus("Đã kết nối ví!");
       }
     } catch (error) {
@@ -41,6 +48,26 @@ const MultipleSignaturePage: NextPage = () => {
     }
   };
 
+  const nativeScript: NativeScript = {
+    type: "all",
+    scripts: [
+      { type: "sig", keyHash: deserializeAddress(fixedAddress2).pubKeyHash },
+      { type: "sig", keyHash: deserializeAddress(fixedAddress1).pubKeyHash },
+    ],
+  };
+  const { address: scriptAddr, scriptCbor } = serializeNativeScript(nativeScript);
+
+  useEffect(() => {
+    setScriptAddress(scriptAddr);
+    if (connected) handleWalletConnect();
+    else {
+      setWalletAddress("");
+      setTxHash("");
+      setStatus("");
+      setUtxos([]);
+    }
+  }, [connected]);
+
   const fundScriptAddress = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -48,42 +75,43 @@ const MultipleSignaturePage: NextPage = () => {
     try {
       if (!connected || !wallet) throw new Error("Vui lòng kết nối ví trước!");
       if (!walletAddress) throw new Error("Địa chỉ ví chưa được lấy!");
-      if (!fundAmount) throw new Error("Vui lòng nhập số tiền muốn nạp!");
-
-      const { pubKeyHash: keyHash1 } = deserializeAddress(fixedAddress1);
-      const { pubKeyHash: keyHash2 } = deserializeAddress(fixedAddress2);
-      const nativeScript: NativeScript = {
-        type: "all",
-        scripts: [
-          { type: "sig", keyHash: keyHash1 },
-          { type: "sig", keyHash: keyHash2 },
-        ],
-      };
-      const { address: scriptAddr } = serializeNativeScript(nativeScript);
-      setScriptAddress(scriptAddr);
+      if (!amounts.length) throw new Error("Vui lòng nhập số tiền muốn nạp!");
+      if (!utxos.length) throw new Error("Ví của bạn không có UTxO!");
 
       const provider = getProvider();
       const txBuilder = getTxBuilder();
-      const utxos = await provider.fetchAddressUTxOs(walletAddress);
-      if (!utxos.length) throw new Error("Ví của bạn không có UTxO!");
+      const selectedUtxos = utxos.slice(0, selectedUtxoCount);
 
-      console.log("Funding UTxOs from wallet:", utxos);
+      const totalInputLovelace = selectedUtxos.reduce(
+        (sum, utxo) => sum + parseInt(utxo.output.amount.find((a: any) => a.unit === "lovelace").quantity),
+        0
+      );
+      const totalFundLovelace = amounts.reduce((sum, amt) => sum + parseFloat(amt) * 1000000, 0);
+      if (totalInputLovelace < totalFundLovelace) throw new Error("Không đủ ADA trong UTxO đã chọn!");
 
-      const unsignedTx = await txBuilder
-        .txIn(utxos[0].input.txHash, utxos[0].input.outputIndex, utxos[0].output.amount, utxos[0].output.address)
-        .txOut(scriptAddr, [{ unit: "lovelace", quantity: convertToLovelace(fundAmount) }])
+      let txBuilderWithInputs = selectedUtxos.reduce((builder, utxo) => {
+        return builder.txIn(utxo.input.txHash, utxo.input.outputIndex, utxo.output.amount, utxo.output.address);
+      }, txBuilder);
+
+      amounts.forEach((amount) => {
+        txBuilderWithInputs = txBuilderWithInputs.txOut(scriptAddr, [
+          { unit: "lovelace", quantity: convertToLovelace(amount) },
+        ]);
+      });
+
+      const unsignedTx = await txBuilderWithInputs
         .changeAddress(walletAddress)
         .protocolParams(await provider.fetchProtocolParameters())
+        .setNetwork("preprod")
         .complete();
-
-      console.log("Unsigned Tx (fund):", unsignedTx);
 
       const signedTx = await wallet.signTx(unsignedTx);
       const txHash = await wallet.submitTx(signedTx);
-      setStatus(`Đã nạp ${fundAmount} ADA vào script address: ${txHash}`);
+      setStatus(`Đã nạp ${amounts.reduce((sum, a) => sum + parseFloat(a), 0)} ADA (${amounts.length} UTxO): ${txHash}`);
+      setUtxos(await wallet.getUtxos());
     } catch (error: any) {
-      console.error("Lỗi khi nạp tiền:", error);
       setStatus(`Lỗi khi nạp tiền: ${error.message}`);
+      console.error("Lỗi khi nạp tiền:", error);
     } finally {
       setLoading(false);
     }
@@ -97,69 +125,77 @@ const MultipleSignaturePage: NextPage = () => {
     try {
       if (!connected || !wallet) throw new Error("Vui lòng kết nối ví trước!");
       if (!walletAddress) throw new Error("Địa chỉ ví chưa được lấy!");
-      if (!recipientAddress && !signedTx1) throw new Error("Vui lòng nhập địa chỉ người nhận!");
-      if (!adaAmount && !signedTx1) throw new Error("Vui lòng nhập số lượng ADA!");
+      if (!recipientAddresses.length) throw new Error("Vui lòng nhập ít nhất một địa chỉ người nhận!");
+      if (!transferAmounts.length) throw new Error("Vui lòng nhập số lượng muốn chuyển!");
 
-      const { pubKeyHash: keyHash1 } = deserializeAddress(fixedAddress1);
-      const { pubKeyHash: keyHash2 } = deserializeAddress(fixedAddress2);
-      const nativeScript: NativeScript = {
-        type: "all",
-        scripts: [
-          { type: "sig", keyHash: keyHash1 },
-          { type: "sig", keyHash: keyHash2 },
-        ],
-      };
-      const { address: scriptAddr, scriptCbor } = serializeNativeScript(nativeScript);
-      setScriptAddress(scriptAddr);
+      const provider = getProvider();
+      const scriptUtxos = await provider.fetchAddressUTxOs(scriptAddr);
+      if (!scriptUtxos.length) throw new Error("Không có UTxO trong script address!");
+      if (!scriptCbor) throw new Error("Không có scriptCbor!");
+
+      const outputs: { address: string; unit: string; amount: string }[] = [];
+      const assetMap = new Map<string, string>();
+
+      for (let i = 0; i < recipientAddresses.length; i++) {
+        const address = recipientAddresses[i];
+        if (address && address.startsWith("addr") && address.length > 0) {
+          const rawUnit = assets[i] || "ADA";
+          const unit = rawUnit === "ADA" ? "lovelace" : rawUnit;
+          const multiplier = unit === "lovelace" ? 1000000 : 1; // Giả sử chỉ hỗ trợ ADA, nếu thêm asset khác thì cần metadata
+          const parsedAmount = parseFloat(transferAmounts[i] || "0") || 0;
+          const thisAmount = parsedAmount * multiplier;
+          outputs.push({
+            address: address,
+            unit: unit,
+            amount: thisAmount.toString(),
+          });
+          assetMap.set(
+            unit,
+            (Number(assetMap.get(unit) || 0) + thisAmount).toString()
+          );
+        }
+      }
+
+      const selectedUtxos = keepRelevant(assetMap, scriptUtxos);
+      if (!selectedUtxos.length) throw new Error("Không đủ UTxO phù hợp trong script address!");
 
       if (!signedTx1) {
-        // Bước 1: Ký bằng ví 1
-        if (walletAddress !== fixedAddress1) {
-          throw new Error("Ví hiện tại không khớp với fixedAddress1!");
-        }
-
-        const provider = getProvider();
-        const utxos = await provider.fetchAddressUTxOs(scriptAddr);
-        if (!utxos.length) throw new Error("Không có UTxO trong script address!");
-        if (!scriptCbor) throw new Error("Không có scriptCbor!");
-
-        console.log("UTxOs from scriptAddress:", utxos);
-        console.log("Selected UTxO:", utxos[0]);
-
-        const amountLovelace = convertToLovelace(adaAmount);
+        if (walletAddress !== fixedAddress1) throw new Error("Ví hiện tại không khớp với fixedAddress1!");
 
         const txBuilder = getTxBuilder();
-        const unsignedTx = await txBuilder
-          .txIn(utxos[0].input.txHash, utxos[0].input.outputIndex, utxos[0].output.amount, utxos[0].output.address)
-          .txInScript(scriptCbor)
-          .txOut(recipientAddress, [{ unit: "lovelace", quantity: amountLovelace }])
+        let txBuilderWithInputs = selectedUtxos.reduce((builder, utxo) => {
+          return builder
+            .txIn(utxo.input.txHash, utxo.input.outputIndex, utxo.output.amount, utxo.output.address)
+            .txInScript(scriptCbor);
+        }, txBuilder);
+
+        outputs.forEach((output) => {
+          txBuilderWithInputs = txBuilderWithInputs.txOut(output.address, [
+            { unit: output.unit, quantity: output.amount },
+          ]);
+        });
+
+        const unsignedTx = await txBuilderWithInputs
           .changeAddress(scriptAddr)
           .protocolParams(await provider.fetchProtocolParameters())
+          .setNetwork("preprod")
           .complete();
 
-        console.log("Unsigned Tx:", unsignedTx);
-
         const signedTxFromWallet1 = await wallet.signTx(unsignedTx, true);
-        console.log("Signed Tx from Wallet 1:", signedTxFromWallet1);
         setSignedTx1(signedTxFromWallet1);
         setStatus("Đã ký bằng ví 1. Copy signedTx và disconnect để ký bằng ví 2!");
       } else {
-        // Bước 2: Ký bằng ví 2 và gửi
-        if (walletAddress !== fixedAddress2) {
-          throw new Error("Ví hiện tại không khớp với fixedAddress2!");
-        }
+        if (walletAddress !== fixedAddress2) throw new Error("Ví hiện tại không khớp với fixedAddress2!");
 
-        console.log("Signed Tx from Wallet 1 (before Wallet 2):", signedTx1);
         const signedTx2 = await wallet.signTx(signedTx1, true);
-        console.log("Signed Tx from Wallet 2:", signedTx2);
-
         const txHash = await wallet.submitTx(signedTx2);
         setTxHash(txHash);
         setStatus("Giao dịch đa chữ ký đã gửi thành công: " + txHash);
+        router.push("/transactions");
       }
     } catch (error: any) {
-      console.error("Lỗi khi gửi giao dịch:", error);
-      setStatus(`Lỗi: ${error.message || "Không thể gửi giao dịch"}`);
+      setStatus(`Lỗi: ${error.message}`);
+      console.error("Lỗi khi chuyển tiền:", error);
     } finally {
       setLoading(false);
     }
@@ -170,21 +206,39 @@ const MultipleSignaturePage: NextPage = () => {
     setTimeout(() => setStatus(""), 2000);
   };
 
-  useEffect(() => {
-    if (connected) {
-      handleWalletConnect();
-    } else {
-      setWalletAddress("");
-      setTxHash("");
-      setStatus("");
-      setScriptAddress("");
-      // Không reset recipientAddress, adaAmount, signedTx1 để giữ giá trị
-    }
-  }, [connected]);
+  const addNewUTxO = () => {
+    setAmounts([...amounts, "100"]);
+    setSelectedUtxoCount(selectedUtxoCount + 1);
+  };
+
+  const removeUTxO = (index: number) => {
+    const newAmounts = [...amounts];
+    newAmounts.splice(index, 1);
+    setAmounts(newAmounts);
+    setSelectedUtxoCount(selectedUtxoCount - 1);
+  };
+
+  const addNewRecipient = () => {
+    setRecipientAddresses([...recipientAddresses, ""]);
+    setTransferAmounts([...transferAmounts, ""]);
+    setAssets([...assets, "ADA"]);
+  };
+
+  const removeRecipient = (index: number) => {
+    const newAddresses = [...recipientAddresses];
+    const newAmounts = [...transferAmounts];
+    const newAssets = [...assets];
+    newAddresses.splice(index, 1);
+    newAmounts.splice(index, 1);
+    newAssets.splice(index, 1);
+    setRecipientAddresses(newAddresses);
+    setTransferAmounts(newAmounts);
+    setAssets(newAssets);
+  };
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>Transfer ADA multiple-sign</h1>
+      <h1 className={styles.title}>Multisig Wallet</h1>
       {!connected && (
         <div className={styles.walletWrapper}>
           <CardanoWallet />
@@ -197,97 +251,239 @@ const MultipleSignaturePage: NextPage = () => {
               Địa chỉ ví: {walletAddress.slice(0, 6)}...{walletAddress.slice(-6)}
             </p>
             <CopyToClipboard text={walletAddress} onCopy={() => handleCopy(walletAddress)}>
-              <FaCopy className={styles.copyIcon} />
+              <span className={styles.copyIcon}>
+                <FaCopy />
+              </span>
             </CopyToClipboard>
           </div>
-
-          <h2 className={styles.subtitle}>Nạp tiền vào Script Address</h2>
-          <form onSubmit={fundScriptAddress} className={styles.inputButtonContainer}>
-            <input
-              type="text"
-              value={fundAmount}
-              onChange={(e) => setFundAmount(e.target.value)}
-              placeholder="Amount to Fund (ADA)"
-              className={styles.txInput}
-              disabled={loading}
-            />
-            <button type="submit" className={styles.actionButton} disabled={loading}>
-              {loading ? "Funding..." : "Nạp tiền"}
-            </button>
-          </form>
-
           {scriptAddress && (
             <div className={styles.addressContainer}>
               <p className={styles.txHash}>
                 Script Address: {scriptAddress.slice(0, 6)}...{scriptAddress.slice(-6)}
               </p>
               <CopyToClipboard text={scriptAddress} onCopy={() => handleCopy(scriptAddress)}>
-                <FaCopy className={styles.copyIcon} />
+                <span className={styles.copyIcon}>
+                  <FaCopy />
+                </span>
               </CopyToClipboard>
             </div>
           )}
-          <button className={styles.actionButton} onClick={disconnect}>
+          <button
+            className={styles.actionButton}
+            onClick={async () => {
+              try {
+                await disconnect();
+                setWalletAddress('');
+                setStatus("Ngắt kết nối ví thành công.");
+              } catch (error) {
+                console.error("Disconnect Error:", error);
+                setStatus("Không thể ngắt kết nối ví.");
+              }
+            }}
+          >
             Ngắt kết nối ví
           </button>
-
-          <h2 className={styles.subtitle}>Send ADA</h2>
-          <form onSubmit={handleTransferADA} className={styles.inputButtonContainer}>
-            <input
-              type="text"
-              value={recipientAddress}
-              onChange={(e) => setRecipientAddress(e.target.value)}
-              placeholder="Recipient Address"
-              className={styles.txInput}
-              disabled={loading || !!signedTx1} // Khóa nếu đã ký ví 1
-            />
-            <input
-              type="text"
-              value={adaAmount}
-              onChange={(e) => setAdaAmount(e.target.value)}
-              placeholder="Amount (ADA)"
-              className={styles.txInput}
-              disabled={loading || !!signedTx1} // Khóa nếu đã ký ví 1
-            />
-            <input
-              type="text"
-              value={signedTx1}
-              onChange={(e) => setSignedTx1(e.target.value)}
-              placeholder="Dán signedTx từ ví 1 (nếu có)"
-              className={styles.txInput}
-              disabled={loading}
-            />
-            <button type="submit" className={styles.actionButton} disabled={loading}>
-              {loading ? "Processing..." : signedTx1 ? "Ký và gửi bằng ví 2" : "Ký bằng ví 1"}
-            </button>
-          </form>
-
+  
+          <h2 className={styles.subtitle}>Nạp tiền vào Script</h2>
+          <div className={styles.inputButtonContainer}>
+            <form onSubmit={fundScriptAddress}>
+              <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px" }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: "10px", textAlign: "left", fontWeight: "bold" }}>UTxO</th>
+                    <th style={{ padding: "10px", textAlign: "left", fontWeight: "bold" }}>Số ADA</th>
+                    <th style={{ padding: "10px", textAlign: "left" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {amounts.map((amount, index) => (
+                    <tr key={index}>
+                      <td style={{ padding: "10px" }}>{index + 1}</td>
+                      <td style={{ padding: "10px" }}>
+                        <input
+                          className={styles.txInput}
+                          type="number"
+                          step="0.1"
+                          min="0.1"
+                          value={amount}
+                          onChange={(e) => {
+                            const newAmounts = [...amounts];
+                            newAmounts[index] = e.target.value;
+                            setAmounts(newAmounts);
+                          }}
+                          disabled={loading}
+                        />
+                      </td>
+                      <td style={{ padding: "10px" }}>
+                        <button
+                          type="button"
+                          onClick={() => removeUTxO(index)}
+                          disabled={loading || amounts.length <= 1}
+                          style={{ padding: "5px 10px", background: "#dc3545", color: "#fff", border: "none", borderRadius: "4px", cursor: loading || amounts.length <= 1 ? "not-allowed" : "pointer" }}
+                        >
+                          X
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td colSpan={3} style={{ padding: "10px" }}>
+                      <button
+                        type="button"
+                        onClick={addNewUTxO}
+                        disabled={loading}
+                        style={{ padding: "5px 10px", background: "#007bff", color: "#fff", border: "none", borderRadius: "4px", cursor: loading ? "not-allowed" : "pointer" }}
+                      >
+                        + Thêm UTxO
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <button
+                type="submit"
+                className={styles.actionButton}
+                disabled={loading}
+              >
+                {loading ? "Đang nạp..." : "Nạp tiền"}
+              </button>
+            </form>
+          </div>
+  
+          <h2 className={styles.subtitle}>Chuyển ADA</h2>
+          <div className={styles.inputButtonContainer}>
+            <form onSubmit={handleTransferADA}>
+              <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px" }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: "10px", textAlign: "left", fontWeight: "bold" }}>Địa chỉ nhận</th>
+                    <th style={{ padding: "10px", textAlign: "left", fontWeight: "bold" }}>Số lượng</th>
+                    <th style={{ padding: "10px", textAlign: "left", fontWeight: "bold" }}>Tài sản</th>
+                    <th style={{ padding: "10px", textAlign: "left" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recipientAddresses.map((address, index) => (
+                    <tr key={index}>
+                      <td style={{ padding: "10px" }}>
+                        <input
+                          className={styles.txInput}
+                          type="text"
+                          value={address}
+                          onChange={(e) => {
+                            const newAddresses = [...recipientAddresses];
+                            newAddresses[index] = e.target.value;
+                            setRecipientAddresses(newAddresses);
+                          }}
+                          placeholder="Địa chỉ người nhận"
+                          disabled={loading || !!signedTx1}
+                        />
+                      </td>
+                      <td style={{ padding: "10px" }}>
+                        <input
+                          className={styles.txInput}
+                          type="number"
+                          step="0.1"
+                          min="0.1"
+                          value={transferAmounts[index]}
+                          onChange={(e) => {
+                            const newAmounts = [...transferAmounts];
+                            newAmounts[index] = e.target.value;
+                            setTransferAmounts(newAmounts);
+                          }}
+                          disabled={loading || !!signedTx1}
+                        />
+                      </td>
+                      <td style={{ padding: "10px" }}>
+                        <select
+                          value={assets[index]}
+                          onChange={(e) => {
+                            const newAssets = [...assets];
+                            newAssets[index] = e.target.value;
+                            setAssets(newAssets);
+                          }}
+                          disabled={loading || !!signedTx1}
+                          style={{ padding: "10px", borderRadius: "4px", border: "1px solid #ccc", width: "100px" }}
+                        >
+                          <option value="ADA">ADA</option>
+                          {/* Thêm tài sản khác nếu cần */}
+                        </select>
+                      </td>
+                      <td style={{ padding: "10px" }}>
+                        <button
+                          type="button"
+                          onClick={() => removeRecipient(index)}
+                          disabled={loading || recipientAddresses.length <= 1 || !!signedTx1}
+                          style={{ padding: "5px 10px", background: "#dc3545", color: "#fff", border: "none", borderRadius: "4px", cursor: loading || recipientAddresses.length <= 1 || !!signedTx1 ? "not-allowed" : "pointer" }}
+                        >
+                          X
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td colSpan={4} style={{ padding: "10px" }}>
+                      <button
+                        type="button"
+                        onClick={addNewRecipient}
+                        disabled={loading || !!signedTx1}
+                        style={{ padding: "5px 10px", background: "#007bff", color: "#fff", border: "none", borderRadius: "4px", cursor: loading || !!signedTx1 ? "not-allowed" : "pointer" }}
+                      >
+                        + Thêm người nhận
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <input
+                className={styles.txInput}
+                type="text"
+                value={signedTx1}
+                onChange={(e) => setSignedTx1(e.target.value)}
+                placeholder="Dán signedTx từ ví 1 (nếu có)"
+                disabled={loading}
+              />
+              <button
+                type="submit"
+                className={styles.actionButton}
+                disabled={loading}
+              >
+                {loading ? "Processing..." : signedTx1 ? "Ký và gửi bằng ví 2" : "Ký bằng ví 1"}
+              </button>
+            </form>
+          </div>
+  
           {signedTx1 && (
             <div className={styles.addressContainer}>
               <p className={styles.txHash}>
                 SignedTx từ ví 1: {signedTx1.slice(0, 6)}...{signedTx1.slice(-6)}
               </p>
               <CopyToClipboard text={signedTx1} onCopy={() => handleCopy(signedTx1)}>
-                <FaCopy className={styles.copyIcon} />
+                <span className={styles.copyIcon}>
+                  <FaCopy />
+                </span>
               </CopyToClipboard>
             </div>
           )}
-
+  
           {txHash && (
             <div className={styles.addressContainer}>
               <p className={styles.txHash}>
                 Transaction Hash: {txHash.slice(0, 6)}...{txHash.slice(-6)}
               </p>
               <CopyToClipboard text={txHash} onCopy={() => handleCopy(txHash)}>
-                <FaCopy className={styles.copyIcon} />
+                <span className={styles.copyIcon}>
+                  <FaCopy />
+                </span>
               </CopyToClipboard>
             </div>
           )}
+  
+          {status && <p className={styles.status}>{status}</p>}
         </>
       )}
-
-      {status && <div className={styles.status}>{status}</div>}
     </div>
   );
-};
+}
 
-export default MultipleSignaturePage;
+export default MultisigWalletPage;

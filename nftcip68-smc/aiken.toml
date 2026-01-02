@@ -1,0 +1,23 @@
+name = "aiken-lang/nftcip68-smc"
+version = "0.0.0"
+compiler = "v1.1.5"
+plutus = "v3"
+license = "Apache-2.0"
+description = "Aiken contracts for project 'aiken-lang/nftcip68-smc'"
+
+[repository]
+user = "aiken-lang"
+project = "nftcip68-smc"
+platform = "github"
+
+[[dependencies]]
+name = "aiken-lang/stdlib"
+version = "v2.2.0"
+source = "github"
+
+[[dependencies]]
+name = "logical-mechanism/assist"
+version = "v0.5.1"
+source = "github"
+
+[config]

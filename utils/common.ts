@@ -6,7 +6,8 @@ import {
 } from "@meshsdk/core";
 import { applyParamsToScript } from "@meshsdk/core-cst";
 
-const blockchainProvider = new BlockfrostProvider("preprodNCrPaDqdsCHvUf2uYbqb67R3Z5GP5ycR");
+
+export const blockchainProvider = new BlockfrostProvider("preprodNCrPaDqdsCHvUf2uYbqb67R3Z5GP5ycR");
 // Tạo provider kết nối blockchain Cardano qua Blockfrost, dùng mạng preprod với API key.
 
 export function getProvider() {
@@ -14,6 +15,23 @@ export function getProvider() {
 }
 
 
+
+export async function getWalletInfoForTx(wallet: any) {
+  const utxos = await wallet.getUtxos();
+  const collateral = (await wallet.getCollateral())[0];
+  const walletAddress = await wallet.getChangeAddress();
+
+  if (!utxos || utxos?.length === 0) {
+    throw new Error("No utxos found");
+  }
+  if (!collateral) {
+    throw new Error("No collateral found");
+  }
+  if (!walletAddress) {
+    throw new Error("No wallet address found");
+  }
+  return { utxos, collateral, walletAddress };
+}
 
 export function getScript(
   blueprintCompiledCode: string, // Mã script đã biên dịch từ blueprint

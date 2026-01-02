@@ -132,7 +132,7 @@ const VestingPage: NextPage = () => {
       const { pubKeyHash: signerPubKeyHash } = deserializeAddress(walletAddress);
   
       // Kiểm tra xem signer là owner hay beneficiary
-      const isOwner = signerPubKeyHash === ownerPubKeyHash;
+      // const isOwner = signerPubKeyHash === ownerPubKeyHash;
       const isBeneficiary = signerPubKeyHash === beneficiaryPubKeyHash;  
       // Chỉ kiểm tra thời gian nếu signer là beneficiary
       if (isBeneficiary && currentTime <= lockUntil) {

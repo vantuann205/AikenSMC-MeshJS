@@ -84,7 +84,7 @@ const TransferADAPage: NextPage = () => {
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>Transfer ADA Single-Sign</h1>
+      <h1 className={styles.title}>Single Wallet</h1>
       {!connected && (
         <div className={styles.walletWrapper}>
           <CardanoWallet />

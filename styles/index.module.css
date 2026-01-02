@@ -40,6 +40,7 @@
   color: #ffffff;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  margin: 1rem 0 0 10px;
 }
 
 .actionButton:hover:not(:disabled) {
@@ -127,6 +128,7 @@
 }
 
 .copyIcon {
+  margin-top: 1rem;
   cursor: pointer;
   color: #666;
   font-size: 16px;
@@ -137,13 +139,107 @@
   color: #000;
 }
 
-/* Container cho input và button xếp dọc */
 .inputButtonContainer {
   display: flex;
-  flex-direction: column; /* Xếp dọc */
-  align-items: center; /* Căn giữa theo chiều ngang */
-  gap: 15px; /* Khoảng cách giữa các phần tử */
+  align-items: center;
+  gap: 10px;
   margin: 0.5rem 0;
   width: 100%;
   max-width: 400px;
+}
+
+/* Thêm style mới */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 600px;
+}
+
+.label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.select {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0.8rem 1.2rem;
+  font-size: 1rem;
+  color: #ffffff;
+  width: 100%;
+  max-width: 300px;
+  transition: border-color 0.2s ease;
+}
+
+.select:focus {
+  outline: none;
+  border-color: #00ddeb;
+  box-shadow: 0 0 8px rgba(0, 221, 235, 0.3);
+}
+
+.select::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.metadataPair {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.removeButton {
+  background: #e53e3e;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.removeButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(229, 62, 62, 0.5);
+}
+
+.removeButton:disabled {
+  background: #555555;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+
+/*Loading*/
+.loadingOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(255, 255, 255, 1);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.spinner {
+  border: 6px solid #ccc;
+  border-top: 6px solid #0070f3;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
